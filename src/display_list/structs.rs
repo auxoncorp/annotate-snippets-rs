@@ -248,7 +248,7 @@ pub enum DisplayTextStyle {
 }
 
 /// An indicator of what part of the annotation a given `Annotation` is.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum DisplayAnnotationPart {
     /// A standalone, single-line annotation.
     Standalone,

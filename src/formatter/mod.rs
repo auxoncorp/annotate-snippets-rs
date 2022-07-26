@@ -272,8 +272,8 @@ impl<'a> DisplayList<'a> {
                     DisplayAnnotationPart::Standalone => ' ',
                     DisplayAnnotationPart::LabelContinuation => ' ',
                     DisplayAnnotationPart::Consequitive => ' ',
-                    DisplayAnnotationPart::MultilineStart => '_',
-                    DisplayAnnotationPart::MultilineEnd => '_',
+                    DisplayAnnotationPart::MultilineStart => '─',
+                    DisplayAnnotationPart::MultilineEnd => '─',
                 };
                 let mark = match annotation_type {
                     DisplayAnnotationType::Error => '^',
@@ -290,10 +290,21 @@ impl<'a> DisplayList<'a> {
                     _ => range.0,
                 };
 
+                let mut mark_repeats = range.1 - indent_length;
+                match annotation_part {
+                    DisplayAnnotationPart::LabelContinuation
+                    | DisplayAnnotationPart::Consequitive
+                    | DisplayAnnotationPart::MultilineStart
+                    | DisplayAnnotationPart::MultilineEnd => (),
+                    DisplayAnnotationPart::Standalone => {
+                        mark_repeats = cmp::max(mark_repeats, 1);
+                    }
+                };
+
                 color.paint_fn(
                     Box::new(|f| {
                         format_repeat_char(indent_char, indent_length + 1, f)?;
-                        format_repeat_char(mark, range.1 - indent_length, f)
+                        format_repeat_char(mark, mark_repeats, f)
                     }),
                     f,
                 )?;
@@ -409,15 +420,25 @@ impl<'a> DisplayList<'a> {
                         f,
                     )?;
                 }
+
+                let part = if let DisplaySourceLine::Annotation {
+                    annotation_part, ..
+                } = line
+                {
+                    Some(*annotation_part)
+                } else {
+                    None
+                };
+
                 if *line != DisplaySourceLine::Empty {
                     if !inline_marks.is_empty() || 0 < inline_marks_width {
                         f.write_char(' ')?;
-                        self.format_inline_marks(inline_marks, inline_marks_width, f)?;
+                        self.format_inline_marks(inline_marks, inline_marks_width, part, f)?;
                     }
                     self.format_source_line(line, f)?;
                 } else if !inline_marks.is_empty() {
                     f.write_char(' ')?;
-                    self.format_inline_marks(inline_marks, inline_marks_width, f)?;
+                    self.format_inline_marks(inline_marks, inline_marks_width, part, f)?;
                 }
                 Ok(())
             }
@@ -425,7 +446,7 @@ impl<'a> DisplayList<'a> {
                 f.write_str("...")?;
                 if !inline_marks.is_empty() || 0 < inline_marks_width {
                     format_repeat_char(' ', lineno_width, f)?;
-                    self.format_inline_marks(inline_marks, inline_marks_width, f)?;
+                    self.format_inline_marks(inline_marks, inline_marks_width, None, f)?;
                 }
                 Ok(())
             }
@@ -437,16 +458,34 @@ impl<'a> DisplayList<'a> {
         &self,
         inline_marks: &[DisplayMark],
         inline_marks_width: usize,
+        part: Option<DisplayAnnotationPart>,
         f: &mut fmt::Formatter<'_>,
     ) -> fmt::Result {
-        format_repeat_char(' ', inline_marks_width - inline_marks.len(), f)?;
+        let mut num_spaces = inline_marks_width - inline_marks.len();
+        let mut print_curve = false;
+
+        if part == Some(DisplayAnnotationPart::MultilineStart) && num_spaces >= 1 {
+            num_spaces -= 1;
+            print_curve = true;
+        }
+
+        format_repeat_char(' ', num_spaces, f)?;
+
+        if print_curve {
+            f.write_char('╭')?;
+        }
+
         for mark in inline_marks {
             self.get_annotation_style(&mark.annotation_type).paint_fn(
                 Box::new(|f| {
-                    f.write_char(match mark.mark_type {
-                        DisplayMarkType::AnnotationThrough => '|',
-                        DisplayMarkType::AnnotationStart => '/',
-                    })
+                    let c = match mark.mark_type {
+                        DisplayMarkType::AnnotationThrough => match part {
+                            Some(DisplayAnnotationPart::MultilineEnd) => '╰',
+                            _ => '│',
+                        },
+                        DisplayMarkType::AnnotationStart => '╭',
+                    };
+                    f.write_char(c)
                 }),
                 f,
             )?;

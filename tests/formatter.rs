@@ -461,7 +461,7 @@ fn test_inline_marks_empty_line() {
         line: DisplaySourceLine::Empty,
     }]);
 
-    assert_eq!(dl.to_string(), " | |",);
+    assert_eq!(dl.to_string(), " | │",);
 }
 
 #[test]
@@ -601,9 +601,9 @@ fn test_point_to_double_width_characters_across_lines() {
     let expected = r#" --> <current file>:1:3
   |
 1 |   おはよう
-  |  _____^
-2 | | ございます
-  | |______^ Good morning
+  | ╭─────^
+2 | │ ございます
+  | ╰──────^ Good morning
   |"#;
 
     assert_eq!(DisplayList::from(snippets).to_string(), expected);
